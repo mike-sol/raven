@@ -1,0 +1,104 @@
+#!/usr/bin/env ruby
+
+require 'nokogiri'
+
+ZIGBEE_TIME_OFFSET = Time.utc(2000, 1, 1).to_i
+
+module Zigbee
+  
+  class InstantaneousDemand
+    
+    def initialize(info)
+      @raw = info
+    end
+    
+    def timestamp
+      Time.at(Integer(@raw['TimeStamp']) + ZIGBEE_TIME_OFFSET)
+    end
+    
+    def demand
+      demand = Integer(@raw['Demand'])
+      multiplier = Integer(@raw['Multiplier'])
+      divisor = Integer(@raw['Divisor'])
+      
+      (demand * multiplier).to_f / divisor
+    end
+    
+    def to_s
+      "instantaneous demand: #{timestamp.strftime("%H:%M:%S")} #{demand}KW"
+    end
+    
+  end
+    
+end
+
+class Collector < Nokogiri::XML::SAX::Document
+
+  def initialize(processor)
+    @stack = []
+    @processor = processor
+  end
+
+  def start_element(name, attributes = {})
+    @stack << [name, attributes]
+    
+    if @stack.length == 2
+      @hash = {}
+    elsif @stack.length == 3
+      @value = ''
+    end
+  end
+  
+  def end_element(name)
+    if @stack.length == 2
+      @processor.process(name, @hash)
+      @hash = nil
+    elsif @stack.length == 3
+      @hash[name] = @value
+      @value = nil
+    end
+
+    @stack.pop
+  end
+  
+  def characters(string)
+    @value << string if @value
+  end
+
+end
+
+class Processor
+  
+  def initialize
+  
+  end
+  
+  def process(name, info)
+    case name
+    when 'InstantaneousDemand'
+      puts Zigbee::InstantaneousDemand.new(info)
+    else
+      puts "\e[31m#{name}, #{info.inspect}\e[0m"
+    end
+  end
+  
+end
+
+
+File.open('/dev/ttyUSB0') do |f|
+  parser = Nokogiri::XML::SAX::PushParser.new(Collector.new(Processor.new))
+
+  parser << "<Stream>"
+
+  while true
+    line = f.gets
+    line.gsub!("\0", '')   # seems to send through a bunch of nulls
+    
+#    puts line.inspect
+    parser << line
+  end
+  
+  parser "</Stream>"
+  
+  parser.finish
+end
