@@ -1,21 +1,45 @@
 #!/usr/bin/env ruby
 
 require_relative 'lib/raven'
+require 'pp'
 
-File.open('/dev/ttyUSB0') do |f|
-  parser = Nokogiri::XML::SAX::PushParser.new(Raven::Internal::Collector.new(Raven::Internal::Processor.new))
+File.open('/dev/ttyUSB0', 'r+') do |f|
+  # raven = Raven::Device.new(f)
 
-  parser << "<Stream>"
+  # puts raven.get_time
 
-  while true
-    line = f.gets
-    line.gsub!("\0", '')   # seems to send through a bunch of nulls
-    
-#    puts line.inspect
-    parser << line
+  # raven.run! do |notification|
+  #   puts notification
+  # end
+
+
+  parser = Raven::Internal::BasicXmlParser.new(f)
+  last_full_check = 0
+
+#   f << "<Command>
+#   <Name>close_current_period</Name>
+# </Command>"
+
+  loop do
+    if Time.now.to_i / 30 > last_full_check
+#       f << "<Command>
+#   <Name>get_current_summation_delivered</Name>
+#   <Refresh>Y</Refresh>
+# </Command>"
+#       f << "<Command>
+#   <Name>get_current_period_usage</Name>
+#   <Refresh>Y</Refresh>
+# </Command>"
+      f << "<Command>
+  <Name>get_profile_data</Name>
+  <NumberOfPeriods>12</NumberOfPeriods>
+  <EndTime>0</EndTime>
+  <IntervalChannel>Delivered</IntervalChannel>
+</Command>"
+      last_full_check = Time.now.to_i / 30
+    end
+
+    message_type, message_data = parser.next
+    puts Raven::Notification.build(message_type, message_data)
   end
-  
-  parser "</Stream>"
-  
-  parser.finish
 end

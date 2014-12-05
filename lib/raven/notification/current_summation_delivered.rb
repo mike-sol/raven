@@ -1,11 +1,11 @@
-class Raven::Notification::InstantaneousDemand < Raven::Notification
+class Raven::Notification::CurrentSummationDelivered < Raven::Notification
 
   def timestamp
     Time.at(Integer(@raw['TimeStamp']) + ZIGBEE_TIME_OFFSET)
   end
 
-  def demand
-    demand = Integer(@raw['Demand'])
+  def delivered
+    demand = Integer(@raw['SummationDelivered'])
     multiplier = Integer(@raw['Multiplier'])
     divisor = Integer(@raw['Divisor'])
 
@@ -13,7 +13,7 @@ class Raven::Notification::InstantaneousDemand < Raven::Notification
   end
 
   def to_s
-    "InstantaneousDemand: #{timestamp.strftime("%Y-%m-%d %H:%M:%S")} #{demand}W"
+    "CurrentSummationDelivered: #{timestamp.strftime("%Y-%m-%d %H:%M:%S")} #{delivered}Wh"
   end
 
 end
